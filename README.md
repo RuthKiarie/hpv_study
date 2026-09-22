@@ -10,34 +10,6 @@ SageMaker + DynamoDB) before real survey data access is available.
 produced by a random-number generator. Nothing here was extracted, scraped,
 or derived from any specific person's record.
 
-## Why synthetic, and why it's legal to use
-
-- Getting individual-level real-world Kenyan health survey data
-  (e.g. KDHS microdata) requires registration and approval through the DHS
-  Program, and literal HPV-vaccination-status data from published studies
-  is typically restricted under Kenya's Data Protection Act / study ethics
-  terms, available only on reasonable request to the original researchers.
-- To keep this project moving without waiting on that approval process, this
-  dataset instead **simulates** a population with the same *schema* and
-  *directionally consistent* predictor relationships reported in the
-  published Kenyan cervical-cancer-screening literature (which is what
-  the available KDHS-based studies actually measure — see caveats below).
-- Using published prevalence rates and odds-ratio directions as design
-  parameters for a simulation is not a copyright or data-protection issue:
-  statistical facts aren't copyrightable, and no real individual's data is
-  reproduced, referenced, or re-identifiable here.
-
-## Important caveat — screening vs. HPV vaccination
-
-The outcome variable in this dataset (`screened_last_3yrs`) represents
-**cervical cancer screening uptake**, not literal HPV vaccination status.
-This is a deliberate choice: KDHS-based studies (the closest real,
-practically-obtainable Kenyan dataset) measure screening uptake, not
-vaccination status. Genuine HPV-vaccination-outcome data exists in Kenya
-(e.g. Moucheraud et al. 2024, *Vaccine*) but is not openly downloadable.
-Screening uptake is used here as a proxy for "HPV-related preventive care
-engagement," consistent with how published Kenyan researchers frame this
-same variable.
 
 ## How it was generated
 
