@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+ENV/
+
+# Local Data & Simulation Folders (from your data/ directory)
+data/kenya_hpv_screening_synthetic.csv
+data/s3_sim/
+outputs/
+*.csv
+*.parquet
+*.zip
+
+# IDEs & System Files
+.vscode/
+.idea/
+.DS_Store

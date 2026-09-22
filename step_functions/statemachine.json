@@ -1,0 +1,105 @@
+{  "Comment": 
+"HPV screening risk pipeline - states 1-2: Glue feature engineering, then SageMaker Processing",  
+"StartAt": "RunGlueETLJob",  
+"States": {    
+  "RunGlueETLJob": {      
+    "Type": "Task",      
+    "Resource": "arn:aws:states:::glue:startJobRun.sync",      
+    "Parameters": {        
+      "JobName": "hpv-feature-etl",        
+      "Arguments": {          
+        "--RAW_PATH": "s3://rwk-hpv-mlops/raw/kenya_hpv_screening/dt=2026-09-19/kenya_hpv_screening_synthetic.csv",          
+        "--FEATURE_PATH": "s3://rwk-hpv-mlops/features/kenya_hpv_screening/",          
+        "--DT": "2026-09-19"        
+        }      
+        },      
+        "Retry": [        
+          {          
+            "ErrorEquals": ["Glue.AWSGlueException"],          
+            "IntervalSeconds": 30,          
+            "MaxAttempts": 2,          
+            "BackoffRate": 2.0        
+            }      
+            ],      
+            "Catch": [        
+              {          
+                "ErrorEquals": ["States.ALL"],          
+                "ResultPath": "$.error",          
+                "Next": "PipelineFailed"        
+                }      
+                ],      
+                "Next": "RunSageMakerProcessing"
+    },    
+    "RunSageMakerProcessing": 
+    {      
+      "Type": "Task",      
+      "Resource": "arn:aws:states:::sagemaker:createProcessingJob.sync",      
+      "Parameters": 
+      {        
+        "ProcessingJobName.$": "States.Format('hpv-feature-processing-{}', $$.Execution.Name)",        
+        "RoleArn": "arn:aws:iam::041904915024:role/sm-hpv-processing-role",        
+        "AppSpecification": 
+        {          
+          "ImageUri": "683313688378.dkr.ecr.us-east-1.amazonaws.com/sagemaker-scikit-learn:1.2-1-cpu-py3",          "ContainerEntrypoint": ["python3", "/opt/ml/processing/input/code/processing_script.py"]        },        "ProcessingResources": {          "ClusterConfig": {            "InstanceCount": 1,            "InstanceType": "ml.m5.large",            "VolumeSizeInGB": 5          }        },        "StoppingCondition": {          "MaxRuntimeInSeconds": 900        },        "ProcessingInputs": [          {            "InputName": "input-1",            "S3Input": {              "S3Uri": "s3://rwk-hpv-mlops/features/kenya_hpv_screening/",              "LocalPath": "/opt/ml/processing/input",              "S3DataType": "S3Prefix",              "S3InputMode": "File",              "S3DataDistributionType": "FullyReplicated"            }          },
+          {            "InputName": "code",            
+          "S3Input": 
+          {              
+            "S3Uri": "s3://rwk-hpv-mlops/processing-code/processing_script.py",              
+            "LocalPath": "/opt/ml/processing/input/code",              
+            "S3DataType": "S3Prefix",              
+            "S3InputMode": "File",              
+            "S3DataDistributionType": "FullyReplicated"            
+            }          
+            }        
+            ],        
+            "ProcessingOutputConfig": {          
+              "Outputs": [            
+              {              
+                "OutputName": "train",              
+                "S3Output": {                
+                  "S3Uri": "s3://rwk-hpv-mlops/processing-output/train/",                
+                  "LocalPath": "/opt/ml/processing/output/train",                
+                  "S3UploadMode": "EndOfJob"              
+                  }            
+                  },            
+                  {              
+                    "OutputName": "test",              
+                    "S3Output": {                
+                      "S3Uri": "s3://rwk-hpv-mlops/processing-output/test/",                
+                      "LocalPath": "/opt/ml/processing/output/test",                
+                      "S3UploadMode": "EndOfJob"              
+                      }            
+                      },            
+                      {              
+                        "OutputName": "report",              
+                        "S3Output": {
+                "S3Uri": "s3://rwk-hpv-mlops/processing-output/report/",                
+                "LocalPath": "/opt/ml/processing/output/report",                
+                "S3UploadMode": "EndOfJob"              
+                }            
+                }          
+                ]        
+                }      
+                },      
+                "Retry": [        
+                  {          
+                    "ErrorEquals": ["SageMaker.AmazonSageMakerException"],          
+                    "IntervalSeconds": 30,          
+                    "MaxAttempts": 2,          
+                    "BackoffRate": 2.0        
+                    }      
+                    ],      
+                    "Catch": [        
+                      {          
+                        "ErrorEquals": ["States.ALL"],          
+                        "ResultPath": "$.error",          
+                        "Next": "PipelineFailed"        
+                        }      
+                        ],      
+                        "End": true    
+                        },    
+                        "PipelineFailed": {      
+                          "Type": "Fail",      
+                          "Cause": "Pipeline failed after retries"    
+                          }  
+                          }}

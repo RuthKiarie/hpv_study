@@ -1,0 +1,20 @@
+{
+  "Name": "hpv-feature-etl",
+  "Role": "arn:aws:iam::041904915024:role/glue-hpv-etl-role",
+  "Command": {
+    "Name": "glueetl",
+    "ScriptLocation": "s3://rwk-hpv-mlops/scripts/glue_etl_job.py",
+    "PythonVersion": "3"
+  },
+  "DefaultArguments": {
+    "--job-bookmark-option": "job-bookmark-disable",
+    "--TempDir": "s3://rwk-hpv-mlops/tmp/",
+    "--enable-metrics": "true",
+    "--enable-continuous-cloudwatch-log": "true"
+  },
+  "GlueVersion": "4.0",
+  "WorkerType": "G.1X",
+  "NumberOfWorkers": 2,
+  "MaxRetries": 0,
+  "Timeout": 15
+}
