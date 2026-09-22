@@ -1,75 +1,52 @@
-# Kenya Cervical Cancer Screening — Synthetic Dataset
+# Kenya Cervical Cancer Screening & Cloud MLOps Pipeline
+# 1. Overview
+Cervical cancer remains a major health challenge in sub-Saharan Africa, yet preventive screening uptake varies widely due to access, education, and health-system links. To build and test a robust production-grade MLOps platform prior to accessing real-world clinical data, I designed an end-to-end cloud pipeline orchestrating AWS Step Functions, AWS Glue, and Amazon SageMaker. The platform is powered by a custom-engineered synthetic dataset of 17,000 simulated Kenyan women (ages 15–49) calibrated closely against national demographic benchmarks.
 
-## What this is
+# 2. Why This Project
+This project mirrors the core architecture and engineering responsibilities of a Senior Machine Learning / MLOps Engineer:
 
-A **fully synthetic** dataset of 17,000 simulated Kenyan women (ages 15–49),
-generated to develop and test an MLOps pipeline (Step Functions + Glue +
-SageMaker + DynamoDB) before real survey data access is available.
+Synthetic Data Engineering: Building a rigorous, reproducible 3-stage generation pipeline (predictors.py, outcome.py, finalize.py) that models complex demographic interactions, wealth disparities, and clinical linkages (such as HIV care integration) matching Kenya Demographic and Health Survey (KDHS) marginals.
 
-**No real individual's data is used anywhere in this file.** Every row is
-produced by a random-number generator. Nothing here was extracted, scraped,
-or derived from any specific person's record.
+Serverless ETL & Data Processing: Utilizing AWS Glue for scalable, serverless data transformation and validation using Pandas.
 
+Cloud Orchestration & Automation: Designing AWS Step Functions state machines (statemachine.json) to automate the handoff between data extraction, Glue processing, and SageMaker model training.
 
-## How it was generated
+Scalable Machine Learning: Training predictive models on Amazon SageMaker with secure IAM least-privilege trust policies.
 
-Three-stage script, in order:
+DevOps & Infrastructure-as-Code: Managing clean repository architectures, secure JSON access policies, and modular pipeline scripts.
 
-1. **`step1_predictors.py`** — samples demographic/access predictors
-   (age, education, residence, county, wealth quintile, health insurance,
-   HIV status, parity, distance-to-facility barrier, cervical-cancer
-   awareness) from distributions approximating Kenya's population
-   structure and KDHS-reported marginals.
-2. **`step2_outcome.py`** — generates the outcome (`screened_last_3yrs`)
-   from a logistic model over the step-1 predictors. Coefficients are set
-   to be directionally and relatively consistent with the published
-   literature (higher education/wealth/urban/insurance/knowledge raise
-   uptake; distance barriers lower it), with a deliberately **strong**
-   effect for HIV-positive status, reflecting Kenya's documented practice
-   of linking HIV-positive women into cervical screening through HIV care
-   programs. The intercept is calibrated by bisection so the
-   population-level prevalence lands at ~17%, within the ~15–20% range
-   reported nationally.
-3. **`step3_finalize.py`** — drops the debug-only probability column and
-   writes the final `kenya_hpv_screening_synthetic.csv`.
+# 3. Tech Stack
+Languages & Core Libraries: Python | Pandas | Scikit-learn | Boto3
 
-Random seed is fixed (42 for predictors, offset for outcome/noise), so the
-dataset is fully reproducible by re-running the scripts.
+Cloud & Orchestration: AWS Step Functions | AWS Glue | Amazon SageMaker | Amazon S3 | AWS IAM
 
-## Schema
+DevOps & Version Control: Git | GitHub | JSON Infrastructure Policies
 
-| Column | Type | Description |
-|---|---|---|
-| `person_id` | string | Synthetic ID (KE100000, KE100001, ...) |
-| `age` | int | 15–49 |
-| `education` | string | none / primary / secondary / higher |
-| `residence` | string | urban / rural |
-| `county` | string | One of 20 sampled Kenyan counties |
-| `wealth_quintile` | ordered category | poorest → richest |
-| `health_insurance` | int (0/1) | NHIF coverage proxy |
-| `hiv_status` | string | negative / positive / unknown |
-| `parity` | int | Number of births |
-| `distance_problem` | string | big_problem / not_big_problem (access barrier) |
-| `heard_of_cervical_cancer` | int (0/1) | Awareness/knowledge variable |
-| `screened_last_3yrs` | int (0/1) | **Target variable** — screening uptake proxy |
+# 4. Data Source
+Dataset Overview: A fully synthetic dataset of 17,000 simulated Kenyan women (ages 15–49). No real individual's data is used; every row is generated via a reproducible random-number generator.
 
-## Validated subgroup patterns (from generation run)
+Generation Design:
 
-- Overall prevalence: 17.0%
-- HIV-positive: 40.3% vs. HIV-negative: 15.8%
-- Education: 9.0% (none) → 25.1% (higher)
-- Wealth: 9.9% (poorest) → 27.0% (richest)
-- Urban 24.0% vs. rural 13.8%
-- Insured 25.6% vs. uninsured 14.3%
-- Aware of cervical cancer 21.0% vs. unaware 9.1%
-- Distance a big problem: 11.7% vs. not a big problem: 19.8%
+Stage 1 (predictors.py): Samples demographics (age, education, residence, county, wealth quintile, insurance, HIV status, parity, distance barriers, and cervical cancer awareness) approximating Kenya's population structure.
 
-## Limitations
+Stage 2 (outcome.py): Simulates screening uptake (screened_last_3yrs) using a logistic model where coefficients reflect published literature (e.g., strong uplift for HIV-positive status due to integrated care programs, calibrated to a ~17% national prevalence).
 
-- This is a simulation for pipeline-development purposes, not a
-  re-estimation of any single published study's exact coefficients.
-- No geographic/county-level clustering effects beyond the urban/rural
-  county-sampling nudge — real DHS data would show much richer
-  county-to-county heterogeneity.
-- Intended to be swapped for real, approved data (KDHS or otherwise) once
-  available — this dataset should not be cited as real-world evidence.
+Stage 3 (finalize.py): Cleans debug metadata and outputs the final production-ready CSV.
+
+Validated Subgroup Highlights: Overall prevalence 17.0% | HIV-positive uptake 40.3% vs. negative 15.8% | Higher education 25.1% vs. none 9.0%.
+
+# 5. Pipeline Access & Repository
+GitHub Repository: RuthKiarie/hpv_study
+
+Cloud Infrastructure Status: Automated via AWS Step Functions state machine (hpv-mlops-pipeline), integrating Glue ETL jobs and SageMaker training steps.
+
+# 6. Architecture & Pipeline
+The system operates on a fully automated, event-triggered cloud architecture:
+
+Data Ingestion & Glue ETL: Raw synthetic records stored in Amazon S3 are processed and cleaned using serverless AWS Glue jobs.
+
+Orchestration: AWS Step Functions coordinates the pipeline sequence from data preparation to model training.
+
+SageMaker Training: Processed data is fed into Amazon SageMaker training jobs to build predictive classification models for screening uptake.
+
+Security & Governance: Strict execution roles and security boundaries are enforced using dedicated S3 and IAM trust policies (glue/, sagemaker/, and step_functions/).
