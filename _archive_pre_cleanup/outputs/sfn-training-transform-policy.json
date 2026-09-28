@@ -1,0 +1,48 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "sagemaker:CreateTrainingJob",
+        "sagemaker:DescribeTrainingJob",
+        "sagemaker:StopTrainingJob",
+        "sagemaker:AddTags"
+      ],
+      "Resource": "arn:aws:sagemaker:us-east-1:041904915024:training-job/hpv-risk-training-*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "sagemaker:CreateModel",
+        "sagemaker:DescribeModel",
+        "sagemaker:DeleteModel",
+        "sagemaker:AddTags"
+      ],
+      "Resource": "arn:aws:sagemaker:us-east-1:041904915024:model/hpv-risk-model-*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "sagemaker:CreateTransformJob",
+        "sagemaker:DescribeTransformJob",
+        "sagemaker:StopTransformJob",
+        "sagemaker:AddTags"
+      ],
+      "Resource": "arn:aws:sagemaker:us-east-1:041904915024:transform-job/hpv-risk-transform-*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": [
+        "arn:aws:iam::041904915024:role/sm-hpv-training-role",
+        "arn:aws:iam::041904915024:role/sm-hpv-transform-role"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["ssm:GetParameter", "ssm:PutParameter"],
+      "Resource": "arn:aws:ssm:us-east-1:041904915024:parameter/hpv-mlops/current-model-artifact"
+    }
+  ]
+}

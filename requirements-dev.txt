@@ -1,0 +1,12 @@
+pytest>=8
+moto[dynamodb,s3]>=5
+boto3
+fastapi
+mangum
+pydantic
+httpx
+pandas
+numpy
+scikit-learn
+joblib
+ruff

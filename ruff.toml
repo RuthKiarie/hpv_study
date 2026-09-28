@@ -1,0 +1,6 @@
+# Lint for real bugs (syntax errors, undefined names, unused imports/variables, bad comparisons),
+# not style. Style rules (import order, line length) would fail CI on working code for no benefit.
+target-version = "py312"
+extend-exclude = ["api/package", "cdk.out", "deploy_assets", "venv", ".venv", "local_test", "s3_sim"]
+[lint]
+select = ["E4", "E7", "E9", "F"]
