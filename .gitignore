@@ -19,3 +19,10 @@ aws/
 /_archive_pre_cleanup/
 /_archive_pre_cleanup/
 /outputs/
+
+# Local outputs, archives, and virtual environments
+/outputs/
+/_archive_pre_cleanup/
+/venv/
+.pytest_cache/
+pytest.ini
