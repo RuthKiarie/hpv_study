@@ -1,103 +1,231 @@
-# Kenya Cervical Cancer Screening — Synthetic Dataset
+# HPV Screening Risk Pipeline (Kenya) - MLOps + DevOps Portfolio Project
 
-## What this is
+An end-to-end, orchestrated machine learning pipeline that predicts cervical-cancer-screening
+risk from synthetic Kenyan demographic/health data; built to demonstrate real MLOps and DevOps
+engineering practice, not just a trained model in a notebook.
 
-A **fully synthetic** dataset of 17,000 simulated Kenyan women (ages 15–49),
-generated to develop and test an MLOps pipeline (Step Functions + Glue +
-SageMaker + DynamoDB) before real survey data access is available.
+**Everything in this repository runs for real in AWS.** Every component listed below was built,
+deployed and independently verified against live AWS resources during development. Built in 2 weeks.
 
-**No real individual's data is used anywhere in this file.** Every row is
-produced by a random-number generator. Nothing here was extracted, scraped,
-or derived from any specific person's record.
+---
 
-## Why synthetic, and why it's legal to use
+## What this project actually does
 
-- Getting individual-level real-world Kenyan health survey data
-  (e.g. KDHS microdata) requires registration and approval through the DHS
-  Program, and literal HPV-vaccination-status data from published studies
-  is typically restricted under Kenya's Data Protection Act / study ethics
-  terms, available only on reasonable request to the original researchers.
-- To keep this project moving without waiting on that approval process, this
-  dataset instead **simulates** a population with the same *schema* and
-  *directionally consistent* predictor relationships reported in the
-  published Kenyan cervical-cancer-screening literature (which is what
-  the available KDHS-based studies actually measure — see caveats below).
-- Using published prevalence rates and odds-ratio directions as design
-  parameters for a simulation is not a copyright or data-protection issue:
-  statistical facts aren't copyrightable, and no real individual's data is
-  reproduced, referenced, or re-identifiable here.
+1. Generates a **fully synthetic** dataset modeling cervical-cancer-screening uptake in Kenya
+   (see [`data/README.md`](data/README.md) for exactly how and why. This is not real patient
+   or government data; see *Why synthetic data* below).
+2. Cleans and feature-engineers it with an **AWS Glue** ETL job.
+3. Validates the data and splits it for training with a **SageMaker Processing** job.
+4. Conditionally retrains a **logistic regression** risk model with **SageMaker Training**,
+   registering the current model's location in **SSM Parameter Store** as a lightweight model
+   registry; so a "skip retraining, use the existing model" run always knows which model to use.
+5. Scores records with **SageMaker Batch Transform**.
+6. Writes risk scores to **DynamoDB** via a **Lambda** function.
+7. Serves scores through a **FastAPI Lambda** and a **Streamlit dashboard**.
+8. All of the above is orchestrated end-to-end by a single **Step Functions** state machine,
+   triggered nightly by **EventBridge**.
+9. The entire stack is also defined as code in **AWS CDK** (Python), with a **GitHub Actions**
+   CI/CD pipeline that lints, tests, builds, synthesizes, shows a `cdk diff` and deploys behind
+   a manual approval gate.
 
-## Important caveat — screening vs. HPV vaccination
+## Architecture
 
-The outcome variable in this dataset (`screened_last_3yrs`) represents
-**cervical cancer screening uptake**, not literal HPV vaccination status.
-This is a deliberate choice: KDHS-based studies (the closest real,
-practically-obtainable Kenyan dataset) measure screening uptake, not
-vaccination status. Genuine HPV-vaccination-outcome data exists in Kenya
-(e.g. Moucheraud et al. 2024, *Vaccine*) but is not openly downloadable.
-Screening uptake is used here as a proxy for "HPV-related preventive care
-engagement," consistent with how published Kenyan researchers frame this
-same variable.
+```
+S3 (raw) → Glue ETL → S3 (features) → Glue Data Catalog / Athena
+                                            │
+                                            ▼
+EventBridge (nightly) → Step Functions ─────┼─────────────────────────────┐
+                            │                │                             │
+                            ▼                ▼                             ▼
+                    SageMaker Processing → Choice: retrain?         (skip) │
+                            │              yes │            no             │
+                            │                  ▼             ▼             │
+                            │         SageMaker Training   SSM Parameter Store
+                            │                  │            (current model) │
+                            │                  └──────┬──────────┘         │
+                            │                         ▼                    │
+                            │                 SageMaker Model               │
+                            │                         │                    │
+                            └─────────────────────────┼────────────────────┘
+                                                       ▼
+                                          SageMaker Batch Transform
+                                                       │
+                                                       ▼
+                                       Lambda (write_results) → DynamoDB
+                                                       │
+                                        ┌──────────────┴──────────────┐
+                                        ▼                              ▼
+                              Lambda (FastAPI) + API Gateway    Streamlit dashboard
+                               / Function URL (see caveat)      (direct DynamoDB read)
+```
 
-## How it was generated
+## Tech stack
 
-Three-stage script, in order:
+| Layer | Technology |
+|---|---|
+| Data engineering | AWS Glue (PySpark), S3, Glue Data Catalog, Athena |
+| ML | SageMaker Processing / Training / Batch Transform, scikit-learn (AWS-managed containers — no custom Docker images) |
+| Orchestration | Step Functions, EventBridge, SSM Parameter Store (model registry) |
+| Serving | DynamoDB, Lambda, FastAPI, Mangum, Streamlit |
+| Infrastructure as Code | AWS CDK (Python) |
+| CI/CD | GitHub Actions, pytest, moto, ruff, actionlint |
 
-1. **`step1_predictors.py`** — samples demographic/access predictors
-   (age, education, residence, county, wealth quintile, health insurance,
-   HIV status, parity, distance-to-facility barrier, cervical-cancer
-   awareness) from distributions approximating Kenya's population
-   structure and KDHS-reported marginals.
-2. **`step2_outcome.py`** — generates the outcome (`screened_last_3yrs`)
-   from a logistic model over the step-1 predictors. Coefficients are set
-   to be directionally and relatively consistent with the published
-   literature (higher education/wealth/urban/insurance/knowledge raise
-   uptake; distance barriers lower it), with a deliberately **strong**
-   effect for HIV-positive status, reflecting Kenya's documented practice
-   of linking HIV-positive women into cervical screening through HIV care
-   programs. The intercept is calibrated by bisection so the
-   population-level prevalence lands at ~17%, within the ~15–20% range
-   reported nationally.
-3. **`step3_finalize.py`** — drops the debug-only probability column and
-   writes the final `kenya_hpv_screening_synthetic.csv`.
+## Repository structure
 
-Random seed is fixed (42 for predictors, offset for outcome/noise), so the
-dataset is fully reproducible by re-running the scripts.
+```
+data/               Synthetic dataset generation (step1–step3) + methodology README
+glue/               Glue ETL job source
+sagemaker/          Processing, training (incl. inference functions), scoring-input prep
+step_functions/      The orchestration state machine (statemachine.json)
+lambda/              write_results Lambda (scores → DynamoDB)
+api/                 FastAPI read-side app + Streamlit dashboard
+cdk/                 Full infrastructure-as-code stack (parallel "v2" resources — see below)
+deploy_assets/       Code/data files CDK deploys into S3 (built from source, not hand-edited)
+scripts/             build_assets.sh, build_lambda_package.sh, setup_github_oidc.sh
+tests/               Unit, API, state-machine-structure, and cross-file contract tests
+.github/workflows/   CI/CD pipeline (lint → test → build → synth → diff → approve → deploy)
+```
 
-## Schema
+---
 
-| Column | Type | Description |
-|---|---|---|
-| `person_id` | string | Synthetic ID (KE100000, KE100001, ...) |
-| `age` | int | 15–49 |
-| `education` | string | none / primary / secondary / higher |
-| `residence` | string | urban / rural |
-| `county` | string | One of 20 sampled Kenyan counties |
-| `wealth_quintile` | ordered category | poorest → richest |
-| `health_insurance` | int (0/1) | NHIF coverage proxy |
-| `hiv_status` | string | negative / positive / unknown |
-| `parity` | int | Number of births |
-| `distance_problem` | string | big_problem / not_big_problem (access barrier) |
-| `heard_of_cervical_cancer` | int (0/1) | Awareness/knowledge variable |
-| `screened_last_3yrs` | int (0/1) | **Target variable** — screening uptake proxy |
+## Honest design decisions and trade-offs
 
-## Validated subgroup patterns (from generation run)
+This section exists on purpose. A project like this involves real engineering trade-offs and
+documenting them accurately is more useful and more honest, than hiding them.
 
-- Overall prevalence: 17.0%
-- HIV-positive: 40.3% vs. HIV-negative: 15.8%
-- Education: 9.0% (none) → 25.1% (higher)
-- Wealth: 9.9% (poorest) → 27.0% (richest)
-- Urban 24.0% vs. rural 13.8%
-- Insured 25.6% vs. uninsured 14.3%
-- Aware of cervical cancer 21.0% vs. unaware 9.1%
-- Distance a big problem: 11.7% vs. not a big problem: 19.8%
+### No Docker, anywhere
 
-## Limitations
+Docker was deliberately excluded from this project from the start (difficult to install in the
+target environment). Every place Docker would normally be the default solution has a Docker-free
+alternative instead:
 
-- This is a simulation for pipeline-development purposes, not a
-  re-estimation of any single published study's exact coefficients.
-- No geographic/county-level clustering effects beyond the urban/rural
-  county-sampling nudge — real DHS data would show much richer
-  county-to-county heterogeneity.
-- Intended to be swapped for real, approved data (KDHS or otherwise) once
-  available — this dataset should not be cited as real-world evidence.
+- **SageMaker Processing/Training/Batch Transform** use AWS's **pre-built, managed containers**
+  (`sagemaker-scikit-learn`), resolved via the SDK or a manually-verified ECR image URI — never a
+  custom-built image.
+- **The FastAPI Lambda's compiled dependencies** (notably `pydantic_core`, which has a native Rust
+  extension) are installed with `pip install --platform manylinux2014_x86_64 --python-version 3.12
+  --implementation cp --abi cp312 --only-binary=:all:` — this forces pip to fetch
+  Lambda-compatible Linux wheels on any host OS, without needing a matching container to build in.
+  This exact approach is what `scripts/build_lambda_package.sh` automates, with an import-time
+  check that catches a platform mismatch at build time instead of at runtime (this bug was hit
+  once during development and cost real debugging time; the check exists specifically because
+  of that).
+
+### Public API access is blocked at the account level - documented, not hidden
+
+The FastAPI read-side Lambda works correctly, verified with a full automated test suite and
+direct `aws lambda invoke` calls returning correct data. **Public HTTPS access to it does not
+currently work.**
+
+Both routes to public access were tried and both failed identically:
+- **API Gateway** (HTTP API, `AWS_PROXY` integration) - rebuilt from scratch twice, with every
+  component (route, integration, stage, Lambda resource policy) independently verified correct.
+  Consistently returned `500 Internal Server Error`.
+- **Lambda Function URL** (`AuthType: NONE`) - resource policy verified correct via
+  `aws lambda get-policy`. Returns `403 Forbidden` with `x-amzn-ErrorType: AccessDeniedException`
+  directly from AWS Lambda's own authorization layer (confirmed via `curl -v`, not a network or
+  client-side issue).
+
+The consistent failure across two independent, unrelated AWS mechanisms; both specifically on
+the *public/unauthenticated* access path, with everything else in this project (SageMaker, Glue,
+DynamoDB, IAM) working correctly, points to an account-level restriction on publicly-invocable
+Lambda endpoints, a known anti-abuse measure some AWS accounts have applied by default. This
+wasn't conclusively provable from my side and is documented here as a
+precisely diagnosed, evidence-backed constraint rather than an unexplained gap.
+
+**Practical consequence**: the Streamlit dashboard connects to DynamoDB **directly via `boto3`**
+using the my AWS credentials, rather than through the public API, a legitimate
+architectural choice for an internal tool (not a workaround), documented explicitly in
+`api/dashboard_data.py`.
+
+### DynamoDB `Scan` vs. a Global Secondary Index
+
+The `/scores?risk_tier=high` endpoint and the dashboard's tier filter both use a table `Scan`
+with a filter expression, not an indexed `Query`, there's no GSI on `risk_tier`. At this
+project's scale (~3,400 rows) this is fast and inexpensive. At real production scale (millions of
+rows), a GSI on `risk_tier` would be the correct fix. Also worth knowing: DynamoDB's `Limit`
+parameter caps rows *scanned*, not rows *returned after filtering*, so a tier-filtered request
+can return fewer rows than requested even when more matches exist. Documented in code comments
+at the point of use.
+
+### Label leakage was deliberately excluded from training
+
+`high_risk_flag` (HIV-positive AND not yet screened) is *derived from* the target variable
+(`screened_last_3yrs`); including it as a model feature would leak the answer directly into the
+input. It's excluded from `FEATURE_COLS` in `sagemaker/train.py` and `tests/test_train.py`
+enforces this exclusion so it can't silently regress.
+
+### Two parallel infrastructure generations (v1 manual, v2 CDK)
+
+The pipeline was first built by hand (AWS CLI, one resource at a time) to validate the
+architecture end-to-end before investing in infrastructure-as-code. The CDK stack in `cdk/`
+deploys a **separate, independently-named set of resources** (distinct bucket, table, roles,
+state machine) rather than adopting the original hand-built ones, deliberately, to prove the
+whole architecture is reproducible as code without risking the already-working manual deployment.
+`cdk/hpv_mlops_stack.py` includes explicit `assert` checks that fail the study loudly if any
+old, hardcoded resource reference ever leaks into the new stack.
+
+---
+
+## How to reproduce this
+
+### Prerequisites
+- AWS account with CLI access configured
+- Python 3.12, Node.js 20+ (for the CDK CLI)
+- No Docker required, anywhere in this project
+
+### One-time setup
+```bash
+pip install -r requirements-dev.txt
+npm install -g aws-cdk
+pip install -r cdk/requirements.txt
+
+# Build the deployable assets from source
+./scripts/build_assets.sh
+./scripts/build_lambda_package.sh
+
+# One-time per AWS account/region
+cd cdk && cdk bootstrap && cd ..
+```
+
+### Deploy
+```bash
+cd cdk && cdk deploy && cd ..
+```
+Or push to `main`; GitHub Actions will lint, test, build, synthesize, show a `cdk diff` and
+wait for manual approval before deploying (see *CI/CD*, below). One-time setup for that path:
+```bash
+GH_REPO=<your-username>/<your-repo> ./scripts/setup_github_oidc.sh
+```
+then add the printed role ARN as the `AWS_DEPLOY_ROLE_ARN` repository variable and create a
+`production` environment with required reviewers, in GitHub repo Settings.
+
+### Run the pipeline
+```bash
+aws stepfunctions start-execution \
+  --state-machine-arn <StateMachineArn from CDK output> \
+  --input '{"retrain_requested": true}'
+```
+
+### View results
+```bash
+cd api && streamlit run dashboard.py
+```
+
+## Testing & CI/CD
+
+`pytest` (unit, API via `moto`-mocked DynamoDB, state-machine structural checks and cross-file
+contract tests catching the exact seams that broke during development, e.g. training expecting
+a column the ETL job never produces) all run in CI on every push/PR, with no AWS credentials
+needed. Deploys are gated behind a manual approval on a protected GitHub environment, and the
+post-deploy step smoke-tests the live API Lambda before considering the deploy complete.
+
+## Known limitations
+
+- Public HTTPS access to the API is blocked (see above); data access is via direct AWS
+  credentials (CLI, `boto3`, or the Streamlit dashboard).
+- No GSI on `risk_tier`; fine at current scale, documented as a production-scale improvement.
+- The synthetic dataset models *screening uptake* as a proxy for HPV-preventive-care engagement,
+  not literal HPV vaccination status; see `data/README.md` for the full reasoning.
+- `ml.m5.large` is used throughout for simplicity; not cost-optimized for production traffic
+  patterns.
