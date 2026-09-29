@@ -13,3 +13,9 @@ response*.json
 *.zip
 awscliv2.zip
 aws/
+
+# Local outputs and archives
+/outputs/
+/_archive_pre_cleanup/
+/_archive_pre_cleanup/
+/outputs/
