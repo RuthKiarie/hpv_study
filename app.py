@@ -24,7 +24,13 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import train_test_split
 
-DATA_PATH = Path(__file__).parent / "kenya_hpv_screening_synthetic.csv"
+_HERE = Path(__file__).parent
+_CSV = "kenya_hpv_screening_synthetic.csv"
+# Works whether app.py sits at the repo root, in dashboard/, or next to the CSV.
+DATA_PATH = next(
+    (p for p in [_HERE / _CSV, _HERE / "data" / _CSV, _HERE.parent / "data" / _CSV] if p.exists()),
+    _HERE / _CSV,
+)
 
 FEATURE_COLS = [
     "age", "education_ord", "wealth_ord", "is_urban", "health_insurance",
@@ -104,7 +110,7 @@ st.caption(
 )
 st.warning(
     "**All data here is synthetic**, modelled on Kenyan demographic and health patterns. "
-    "It is not real patient data and nothing on this page is a finding about real women.",
+    "It is not real patient data, and nothing on this page is a finding about real women.",
     icon="⚠️",
 )
 
