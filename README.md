@@ -104,7 +104,7 @@ alternative instead:
   custom-built image.
 - **The FastAPI Lambda's compiled dependencies** (notably `pydantic_core`, which has a native Rust
   extension) are installed with `pip install --platform manylinux2014_x86_64 --python-version 3.12
-  --implementation cp --abi cp312 --only-binary=:all:` — this forces pip to fetch
+  --implementation cp --abi cp312 --only-binary=:all:` - this forces pip to fetch
   Lambda-compatible Linux wheels on any host OS, without needing a matching container to build in.
   This exact approach is what `scripts/build_lambda_package.sh` automates, with an import-time
   check that catches a platform mismatch at build time instead of at runtime (this bug was hit
