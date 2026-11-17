@@ -64,7 +64,7 @@ EventBridge (nightly) → Step Functions ─────┼───────
 | Layer | Technology |
 |---|---|
 | Data engineering | AWS Glue (PySpark), S3, Glue Data Catalog, Athena |
-| ML | SageMaker Processing / Training / Batch Transform, scikit-learn (AWS-managed containers — no custom Docker images) |
+| ML | SageMaker Processing / Training / Batch Transform, scikit-learn (AWS-managed containers - no custom Docker images) |
 | Orchestration | Step Functions, EventBridge, SSM Parameter Store (model registry) |
 | Serving | DynamoDB, Lambda, FastAPI, Mangum, Streamlit |
 | Infrastructure as Code | AWS CDK (Python) |
@@ -73,13 +73,13 @@ EventBridge (nightly) → Step Functions ─────┼───────
 ## Repository structure
 
 ```
-data/               Synthetic dataset generation (step1–step3) + methodology README
+data/               Synthetic dataset generation (step1-step3) + methodology README
 glue/               Glue ETL job source
 sagemaker/          Processing, training (incl. inference functions), scoring-input prep
 step_functions/      The orchestration state machine (statemachine.json)
 lambda/              write_results Lambda (scores → DynamoDB)
 api/                 FastAPI read-side app + Streamlit dashboard
-cdk/                 Full infrastructure-as-code stack (parallel "v2" resources — see below)
+cdk/                 Full infrastructure-as-code stack (parallel "v2" resources - see below)
 deploy_assets/       Code/data files CDK deploys into S3 (built from source, not hand-edited)
 scripts/             build_assets.sh, build_lambda_package.sh, setup_github_oidc.sh
 tests/               Unit, API, state-machine-structure, and cross-file contract tests
@@ -100,7 +100,7 @@ target environment). Every place Docker would normally be the default solution h
 alternative instead:
 
 - **SageMaker Processing/Training/Batch Transform** use AWS's **pre-built, managed containers**
-  (`sagemaker-scikit-learn`), resolved via the SDK or a manually-verified ECR image URI — never a
+  (`sagemaker-scikit-learn`), resolved via the SDK or a manually-verified ECR image URI - never a
   custom-built image.
 - **The FastAPI Lambda's compiled dependencies** (notably `pydantic_core`, which has a native Rust
   extension) are installed with `pip install --platform manylinux2014_x86_64 --python-version 3.12
